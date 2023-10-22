@@ -24,6 +24,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import re
 from html.parser import HTMLParser
 
 from novaprinter import prettyPrinter
@@ -41,7 +42,7 @@ class zetorrents(object):
     possible categories are ('all', 'anime', 'books', 'games', 'movies', 'music', 'pictures', 'software', 'tv').
     """
 
-    url = 'https://zetorrents.com'
+    url = 'https://www.zetorrents.com'
     name = 'ZeTorrents'
 
     supported_categories = {
@@ -58,7 +59,7 @@ class zetorrents(object):
     MAX_PAGES_LOOKUP = 10
 
     class zeTorrentsParser(HTMLParser):
-        """Parses acg.rip browse page for search results and stores them."""
+        """Parses zetorrents.com browse page for search results and stores them."""
         
         def __init__(self, infos, url):
             """
@@ -82,168 +83,137 @@ class zetorrents(object):
               
             self.engine_url = url
             self.results = []
-            self.row = {}
+            self.torrent_infos = {}
 
-            self.is_inside_row = False
             self.is_found_content = False
-            self.is_found_table = False
 
             self.td_counter = -1
             self.span_counter = -1
             self.a_counter = -1
 
-            # Page number indicators to determine when to stop iterating
-            # through result pages
-            self.is_in_pages_div = False
-            self.has_more_pages_after = True
-            self.is_in_page_number_span = False
-            self.is_page_number_a = False
+        def get_torrent_url_from_page_url(self, page_url):
+            torrent_page = retrieve_url(page_url)
+            torrent_regex = r'href="\/downloads\/torrentFile\/.*\.torrent"'
+            matches = re.finditer(torrent_regex, torrent_page, re.MULTILINE)
+            torrent_urls = [x.group() for x in matches]
 
+            if len(torrent_urls) > 0:
+                return torrent_urls[0].split('"')[1]
+
+            return None
+        
         def handle_starttag(self, tag, attrs):
             params = dict(attrs)
 
-            if 'content-list-torrent' in params.get('class'):
+            if params.get('class') == 'content-list-torrent':
                 self.is_found_content = True
-                return
 
-            if self.is_found_content and tag == 'tbody':
-                self.is_found_table = True
-                return
+            elif self.is_found_content:
 
-            if self.is_found_table and tag == 'tr':
-                self.is_inside_row = True
-                return
+                if tag == 'tr':
+                    self.td_counter = -1
 
-            if self.is_inside_row and tag == 'td':
-                self.td_counter += 1
-                return
-        
-            if self.is_inside_row and self.td_counter > -1 and tag == 'span':
-                self.span_counter += 1
-                return
+                elif tag == 'td':
+                    self.td_counter += 1
 
-            if self.is_inside_row and self.td_counter > -1 and tag == 'a':
-                self.a_counter += 1
+                elif self.td_counter > -1:
+                            
+                    if tag == 'span':
+                        self.span_counter += 1
 
-                if self.td_counter == 0:
+                    elif tag == 'a':
+                        self.a_counter += 1
 
-                    if 'href' not in params:
-                        return
-                    
-                    href = params['href']
+                        if self.td_counter == 0:
 
-                    if href.startswith('/torrents/'):
-                        link = f'{self.engine_url}{href}'
-                        self.row['link'] = link
-                        self.row['engine_url'] = self.engine_url
-                        self.row['desc_link'] = link
+                            if 'href' not in params:
+                                return
+                            
+                            href = params['href']
 
-                return
+                            if href.startswith('/torrents/'):
+                                link = f'{self.engine_url}{href}'
 
-            if 'pages' in params.get('class'):
-                self.is_in_pages_div = True
-                return
+                                torrent_url = self.get_torrent_url_from_page_url(link)
 
-            if self.is_in_pages_div and params.get('rel') == 'next':
-                self.has_more_pages_after = False
-                return
+                                if torrent_url:
+                                    self.torrent_infos['link'] = self.engine_url + torrent_url
+                                    self.torrent_infos['engine_url'] = self.engine_url
+                                    self.torrent_infos['desc_link'] = link
 
-            if self.is_in_pages_div \
-            and tag == 'span' \
-            and 'nextPrev' not in params.get('class'):
-                self.is_in_page_number_span = True
-                return
-
-            if self.is_in_page_number_span and tag == 'a':
-                self.is_page_number_a = True
 
         def handle_torrent_data(self, data):
-            if self.td_counter > -1 \
-            and self.td_counter < self.NB_OF_COLUMNS:
+            if (
+                self.td_counter > 0  # We skip the first "td"
+                and self.td_counter < self.NB_OF_COLUMNS
+            ):
 
                 match self.td_counter:
                     # Catch the name
                     case 1:
                         if self.a_counter == 0:
-                            self.row['name'] = data.strip()
+                            self.torrent_infos['name'] = data.strip()
 
                     # Catch the size
                     case 2:
-                        if self.a_counter == 0:
-                            self.row['size'] = data.strip()
+                        if self.span_counter == 0:
+                            self.torrent_infos['size'] = unit_fr2en(data.strip())
 
                     # Catch the seeds
                     case 3:
                         if self.span_counter == 0:
                             try:
-                                self.span_counter += 2
-                                self.row['seeds'] = int(data.strip())
+                                self.torrent_infos['seeds'] = int(data.strip())
                             except ValueError:
-                                self.row['seeds'] = -1
+                                self.torrent_infos['seeds'] = -1
 
                     # Catch the leeches
                     case 4:
                         if self.span_counter == 0:
                             try:
-                                self.span_counter += 2
-                                self.row['leech'] = int(data.strip())
+                                self.torrent_infos['leech'] = int(data.strip())
                             except ValueError:
-                                self.row['leech'] = -1
-
-        def handle_page_number_data(self, data):
-            if not self.has_more_pages_after \
-            and self.is_page_number_a:
-                page_count = int(data.strip())    
-                
-                if page_count > self.page_infos.max_pages_count:
-                    self.page_infos.max_pages_count = int(data.strip())
+                                self.torrent_infos['leech'] = -1
 
         def handle_data(self, data):
             self.handle_torrent_data(data)                
-            self.handle_page_number_data(data)
+        
+        def print_row_and_reinit(self):
+            self.td_counter = -1
+
+            array_length = len(self.torrent_infos)
+
+            if array_length < 1:
+                return
+
+            self.page_infos['hit_count'] += 1
+            
+            # print(self.torrent_infos)
+            prettyPrinter(self.torrent_infos)
+            
+            self.torrent_infos = {}
 
         def handle_endtag(self, tag):
-            if tag == 'table':
-
+            if self.is_found_content and tag == 'table':
                 self.is_found_content = False
-                self.is_found_table = False
 
-            if self.is_inside_row and tag == 'tr':
-                self.is_inside_row = False
-                self.td_counter = -1
-                
-                array_length = len(self.row)
-                if array_length < 1:
-                    return
-                
-                self.page_infos.hit_count += 1
-                
-                prettyPrinter(self.row)
-                self.row = {}
-
-            if self.is_in_pages_div and tag == 'div':
-                self.is_in_pages_div = False
-                        
-            if self.is_in_page_number_span and tag == 'span':
-                self.is_in_page_number_span = False
-                self.is_page_number_a = False
-
-            if self.span_counter > -1 and tag == 'span':
-                self.span_counter -= 1
+            elif self.td_counter > -1:
+                if self.span_counter > -1 and tag == 'span':
+                    self.span_counter -= 1
             
-            if self.a_counter > -1 and tag == 'a':
-                self.a_counter -= 1
+                elif self.a_counter > -1 and tag == 'a':
+                    self.a_counter -= 1
 
-    def download_torrent(self, info):
-        print(download_file(info))
+                if self.td_counter == self.NB_OF_COLUMNS - 1:
+                    self.print_row_and_reinit()
         
     def build_url(self, url, query, category=None, page=1):
         page_url = f'{url}/torrents/find/'
 
         if category:
-            page_url += f'1/${category}/'
+            page_url += f'1/{category}/'
     
-        return f'${page_url}:${page}?title={query}'
+        return f'{page_url}:{page}?title={query}'
 
     # DO NOT CHANGE the name and parameters of this function
     # This function will be the one called by nova2.py
@@ -260,7 +230,6 @@ class zetorrents(object):
 
         page_infos = {
             'hit_count': 0,
-            'max_pages_count': -1,
         }
 
         parser = self.zeTorrentsParser(page_infos, self.url)
@@ -269,21 +238,31 @@ class zetorrents(object):
 
         while True:
             page_url = self.build_url(self.url, what, category, page_index)
+            
             html = retrieve_url(page_url)
+
+            # Trying to find the page arrow to know if
+            # we should carry on iterating
+            right_arrow_regex = r'<a\s*href=".*"\s*rel="next"\s*>><\/a>'
+            is_last_page = len(re.findall(right_arrow_regex, html)) > 0
+
             parser.feed(html)
 
-            max_pages_count = self.MAX_PAGES_LOOKUP
-            
-            if page_infos.max_pages_count > -1:
-                max_pages_count = page_infos.max_pages_count
-
             if (
-                page_infos.hit_count < self.RESULTS_PER_PAGE
-                or page_index >= max_pages_count
+                not is_last_page
+                or page_infos['hit_count'] < self.RESULTS_PER_PAGE
             ): break
 
-            page_infos.hit_count = 0
+            page_infos['hit_count'] = 0
 
             page_index += 1
 
         parser.close()
+
+def unit_fr2en(size):
+    """Convert french size unit to english unit"""
+    return re.sub(
+        r'([KMGTP])o',
+        lambda match: match.group(1) + 'B',
+        size, flags=re.IGNORECASE
+    )
