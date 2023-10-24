@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# VERSION: 1.01
+# VERSION: 1.11
 # AUTHORS: alexandre-eliot <alexandre.eliot@outlook.com>
 # INSPIRED BY THE WORK OF
 # sa3dany, Alyetama, BurningMop, scadams
@@ -46,13 +46,13 @@ class zetorrents(object):
     name = 'ZeTorrents'
 
     supported_categories = {
-        'all': None,
-        'anime': 'animation',
-        'books': 'ebooks',
-        'games': 'jeux-pc',
-        'movies': 'films',
-        'music': 'musique',
-        'tv': 'series',
+        'all': [None],
+        'anime': ['animation'],
+        'books': ['ebooks'],
+        'games': ['jeux-pc', 'jeux-consoles'],
+        'movies': ['films'],
+        'music': ['musique'],
+        'tv': ['series'],
     }
 
     RESULTS_PER_PAGE = 100
@@ -225,7 +225,7 @@ class zetorrents(object):
         `cat` is the name of a search category in ('all', 'anime', 'books', 'games', 'movies', 'music', 'pictures', 'software', 'tv')
         """
         
-        category = self.supported_categories[cat]
+        categories = self.supported_categories[cat]
 
         page_infos = {
             'hit_count': 0,
@@ -233,28 +233,31 @@ class zetorrents(object):
 
         parser = self.zeTorrentsParser(page_infos, self.url)
 
-        page_index = 1
+        for category in categories:
 
-        while True:
-            page_url = self.build_url(self.url, what, category, page_index)
-            
-            html = retrieve_url(page_url)
+            page_index = 1
 
-            # Trying to find the page arrow to know if
-            # we should carry on iterating
-            right_arrow_regex = r'<a\s*href=".*"\s*rel="next"\s*>><\/a>'
-            is_last_page = len(re.findall(right_arrow_regex, html)) > 0
+            while True:
+                
+                page_url = self.build_url(self.url, what, category, page_index)
+                
+                html = retrieve_url(page_url)
 
-            parser.feed(html)
+                # Trying to find the page arrow to know if
+                # we should carry on iterating
+                right_arrow_regex = r'<a\s*href=".*"\s*rel="next"\s*>><\/a>'
+                is_last_page = len(re.findall(right_arrow_regex, html)) > 0
 
-            if (
-                not is_last_page
-                or page_infos['hit_count'] < self.RESULTS_PER_PAGE
-            ): break
+                parser.feed(html)
 
-            page_infos['hit_count'] = 0
+                if (
+                    not is_last_page
+                    or page_infos['hit_count'] < self.RESULTS_PER_PAGE
+                ): break
 
-            page_index += 1
+                page_infos['hit_count'] = 0
+
+                page_index += 1
 
         parser.close()
 
