@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# VERSION: 1.00
+# VERSION: 1.01
 # AUTHORS: alexandre-eliot <alexandre.eliot@outlook.com>
 # INSPIRED BY THE WORK OF
 # sa3dany, Alyetama, BurningMop, scadams
@@ -56,7 +56,6 @@ class zetorrents(object):
     }
 
     RESULTS_PER_PAGE = 100
-    MAX_PAGES_LOOKUP = 10
 
     class zeTorrentsParser(HTMLParser):
         """Parses zetorrents.com browse page for search results and stores them."""
@@ -111,7 +110,7 @@ class zetorrents(object):
             elif self.is_found_content:
 
                 if tag == 'tr':
-                    self.td_counter = -1
+                    self.print_torrent_infos_and_reinit_row()
 
                 elif tag == 'td':
                     self.td_counter += 1
@@ -178,7 +177,7 @@ class zetorrents(object):
         def handle_data(self, data):
             self.handle_torrent_data(data)                
         
-        def print_row_and_reinit(self):
+        def print_torrent_infos_and_reinit_row(self):
             self.td_counter = -1
 
             array_length = len(self.torrent_infos)
@@ -188,13 +187,16 @@ class zetorrents(object):
 
             self.page_infos['hit_count'] += 1
             
-            # print(self.torrent_infos)
             prettyPrinter(self.torrent_infos)
             
             self.torrent_infos = {}
 
         def handle_endtag(self, tag):
             if self.is_found_content and tag == 'table':
+                # Because we are printing out the previous torrent infos on
+                # detecting a `td` tag, we need to try and print out the last
+                # torrent's infos right before the end of the table
+                self.print_torrent_infos_and_reinit_row()
                 self.is_found_content = False
 
             elif self.td_counter > -1:
@@ -203,9 +205,6 @@ class zetorrents(object):
             
                 elif self.a_counter > -1 and tag == 'a':
                     self.a_counter -= 1
-
-                if self.td_counter == self.NB_OF_COLUMNS - 1:
-                    self.print_row_and_reinit()
         
     def build_url(self, url, query, category=None, page=1):
         page_url = f'{url}/torrents/find/'
