@@ -1,28 +1,17 @@
-# 🧲 ZeTorrents qBitTorrent Search Plugin
+# 🧲 ZeTorrents qBittorrent Search Plugin
 
-<h3 align="center">Search easily through <i>ZeTorrents</i> using this search plugin !</h3>
+<h3 align="center">Search easily through the french torrent website : <i>ZeTorrents</i> !</h3>
 
 <h3>❔ How do I install it ?</h3>
 
 _It's __simple__ !_
 
-- [__Download__ `zetorrents.py`](https://raw.githubusercontent.com/alexandre-eliot/zetorrents_qbittorrent_search_plugin/main/zetorrents.py) from this directory
+_First_, [__download__ `zetorrents.py`](https://raw.githubusercontent.com/alexandre-eliot/zetorrents_qbittorrent_search_plugin/main/zetorrents.py)
 
-_Then_
+_Then_, __follow__ the official [qBittorrent installation tutorial](https://github.com/qbittorrent/search-plugins/wiki/Install-search-plugins)
 
-- __Open__ qBitTorrent
-- __Go__ to the `🔍️ Search` tab
+<h4>Are you done with the installation ?</h4>
 
-_At the bottom_
+🎉 __*Welldone*__ __!__
 
-- __Click__ on `🧩 Search Plugins...`
-<br>_A popup window should appear_
-- __Click__ on `Install a new one` then `Local file`
-
-_Finally_
-
-- __Select__ `zetorrents.py` that you downloaded earlier
-
-🎉 __*Congrats*__ __!__ You should be done and ready to go !
-
-To try it, simply use the  🔍️  search bar at the top of the panel
+Now, type in the `🔍️   ` search bar at the top, and give it a try !
