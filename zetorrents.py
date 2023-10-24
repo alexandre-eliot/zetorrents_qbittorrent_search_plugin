@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# VERSION: 1.11
+# VERSION: 1.12
 # AUTHORS: alexandre-eliot <alexandre.eliot@outlook.com>
 # INSPIRED BY THE WORK OF
 # sa3dany, Alyetama, BurningMop, scadams
@@ -210,7 +210,7 @@ class zetorrents(object):
         page_url = f'{url}/torrents/find/'
 
         if category:
-            page_url += f'1/{category}/'
+            page_url += f'{category}/'
     
         return f'{page_url}:{page}?title={query}'
 
